@@ -1,4 +1,4 @@
-using LogiTrack.Data.Models;
+using LogiTrack.Models;
 
 namespace LogiTrack.Tests;
 

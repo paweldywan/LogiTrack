@@ -1,5 +1,5 @@
 using LogiTrack.Data;
-using LogiTrack.Data.Models;
+using LogiTrack.Models;
 
 using Microsoft.EntityFrameworkCore;
 

@@ -1,4 +1,4 @@
-using LogiTrack.Data.Models;
+using LogiTrack.Models;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -9,4 +9,9 @@ public class LogiTrackContext(DbContextOptions<LogiTrackContext> options) : DbCo
     public DbSet<InventoryItem> InventoryItems { get; set; }
 
     public DbSet<Order> Orders { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(LogiTrackContext).Assembly);
+    }
 }

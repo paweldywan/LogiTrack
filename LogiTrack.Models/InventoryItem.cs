@@ -1,11 +1,7 @@
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-
-namespace LogiTrack.Data.Models;
+namespace LogiTrack.Models;
 
 public class InventoryItem : IEquatable<InventoryItem>
 {
-    [Key]
     public int ItemId { get; set; }
 
     public required string Name { get; set; }
@@ -14,7 +10,6 @@ public class InventoryItem : IEquatable<InventoryItem>
 
     public required string Location { get; set; }
 
-    [ForeignKey(nameof(Order))]
     public int? OrderId { get; set; }
 
     public Order? Order { get; set; }

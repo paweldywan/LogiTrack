@@ -1,12 +1,9 @@
-using System.ComponentModel.DataAnnotations;
-
-namespace LogiTrack.Data.Models;
+namespace LogiTrack.Models;
 
 public class Order
 {
     private const int DefaultItemCapacity = 10;
 
-    [Key]
     public int OrderId { get; set; }
 
     public required string CustomerName { get; set; }
