@@ -21,5 +21,5 @@ public class Order
 
     public void RemoveItem(int itemId) => Items.RemoveWhere(i => i.ItemId == itemId);
 
-    public override string ToString() => $"Order #{OrderId} for {CustomerName} | Items: {Items.Count} | Placed: {DatePlaced:M/d/yyyy}";
+    public override string ToString() => $"Order #{OrderId} for {CustomerName} | Items: {Items.Count} | Placed: {DatePlaced.ToString("M/d/yyyy", System.Globalization.CultureInfo.InvariantCulture)}";
 }
