@@ -1,4 +1,6 @@
-namespace LogiTrack.Models;
+using System.Text.Json.Serialization;
+
+namespace LogiTrack.Domain.Models;
 
 public class InventoryItem : IEquatable<InventoryItem>
 {
@@ -12,6 +14,7 @@ public class InventoryItem : IEquatable<InventoryItem>
 
     public int? OrderId { get; set; }
 
+    [JsonIgnore]
     public Order? Order { get; set; }
 
     public override string ToString() => $"Item: {Name} | Quantity: {Quantity} | Location: {Location}";

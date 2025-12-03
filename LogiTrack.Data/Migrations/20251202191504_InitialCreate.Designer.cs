@@ -20,7 +20,7 @@ namespace LogiTrack.Data.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.11");
 
-            modelBuilder.Entity("LogiTrack.Models.InventoryItem", b =>
+            modelBuilder.Entity("LogiTrack.Domain.Models.InventoryItem", b =>
                 {
                     b.Property<int>("ItemId")
                         .ValueGeneratedOnAdd()
@@ -47,7 +47,7 @@ namespace LogiTrack.Data.Migrations
                     b.ToTable("InventoryItems");
                 });
 
-            modelBuilder.Entity("LogiTrack.Models.Order", b =>
+            modelBuilder.Entity("LogiTrack.Domain.Models.Order", b =>
                 {
                     b.Property<int>("OrderId")
                         .ValueGeneratedOnAdd()
@@ -65,14 +65,14 @@ namespace LogiTrack.Data.Migrations
                     b.ToTable("Orders");
                 });
 
-            modelBuilder.Entity("LogiTrack.Models.InventoryItem", b =>
+            modelBuilder.Entity("LogiTrack.Domain.Models.InventoryItem", b =>
                 {
-                    b.HasOne("LogiTrack.Models.Order", null)
+                    b.HasOne("LogiTrack.Domain.Models.Order", null)
                         .WithMany("Items")
                         .HasForeignKey("OrderId");
                 });
 
-            modelBuilder.Entity("LogiTrack.Models.Order", b =>
+            modelBuilder.Entity("LogiTrack.Domain.Models.Order", b =>
                 {
                     b.Navigation("Items");
                 });

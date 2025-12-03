@@ -1,0 +1,35 @@
+using LogiTrack.Domain.Models;
+
+using Microsoft.EntityFrameworkCore;
+
+namespace LogiTrack.Data.Repositories;
+
+public class InventoryRepository(LogiTrackContext context) : IInventoryRepository
+{
+    public Task<List<InventoryItem>> GetAllAsync() => context.InventoryItems.ToListAsync();
+
+    public ValueTask<InventoryItem?> GetByIdAsync(int id) => context.InventoryItems.FindAsync(id);
+
+    public async Task<InventoryItem> CreateAsync(InventoryItem item)
+    {
+        context.InventoryItems.Add(item);
+
+        await context.SaveChangesAsync();
+
+        return item;
+    }
+
+    public async Task<bool> DeleteAsync(int id)
+    {
+        var item = await context.InventoryItems.FindAsync(id);
+
+        if (item is null)
+            return false;
+
+        context.InventoryItems.Remove(item);
+
+        await context.SaveChangesAsync();
+
+        return true;
+    }
+}

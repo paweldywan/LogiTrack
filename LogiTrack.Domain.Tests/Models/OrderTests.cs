@@ -1,6 +1,6 @@
-using LogiTrack.Models;
+using LogiTrack.Domain.Models;
 
-namespace LogiTrack.Tests;
+namespace LogiTrack.Domain.Tests.Models;
 
 public class OrderTests
 {

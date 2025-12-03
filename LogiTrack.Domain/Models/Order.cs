@@ -1,4 +1,4 @@
-namespace LogiTrack.Models;
+namespace LogiTrack.Domain.Models;
 
 public class Order
 {

@@ -11,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LogiTrack.Models\LogiTrack.Models.csproj" />
+    <ProjectReference Include="..\LogiTrack.Domain\LogiTrack.Domain.csproj" />
   </ItemGroup>
 
 </Project>

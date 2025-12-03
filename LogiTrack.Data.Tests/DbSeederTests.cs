@@ -1,9 +1,9 @@
 using LogiTrack.Data;
-using LogiTrack.Models;
+using LogiTrack.Domain.Models;
 
 using Microsoft.EntityFrameworkCore;
 
-namespace LogiTrack.Tests;
+namespace LogiTrack.Data.Tests;
 
 public class DbSeederTests
 {

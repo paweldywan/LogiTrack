@@ -1,4 +1,4 @@
-using LogiTrack.Models;
+using LogiTrack.Domain.Models;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
