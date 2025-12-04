@@ -1,6 +1,10 @@
+using FluentValidation;
+using FluentValidation.Results;
+
 using LogiTrack.Data.Repositories;
 using LogiTrack.Domain.Models;
 using LogiTrack.Web.Controllers;
+using LogiTrack.Web.Models;
 
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
@@ -15,14 +19,19 @@ public class InventoryControllerTests
     private readonly IInventoryRepository _repository;
     private readonly IMemoryCache _cache;
     private readonly ILogger<InventoryController> _logger;
+    private readonly IValidator<InventoryItem> _validator;
     private readonly InventoryController _controller;
+    private readonly PaginationQuery _defaultPagination = new();
 
     public InventoryControllerTests()
     {
         _repository = Substitute.For<IInventoryRepository>();
         _cache = new MemoryCache(new MemoryCacheOptions());
         _logger = Substitute.For<ILogger<InventoryController>>();
-        _controller = new InventoryController(_repository, _cache, _logger);
+        _validator = Substitute.For<IValidator<InventoryItem>>();
+        _validator.ValidateAsync(Arg.Any<InventoryItem>(), Arg.Any<CancellationToken>())
+            .Returns(new ValidationResult());
+        _controller = new InventoryController(_repository, _cache, _logger, _validator);
     }
 
     [Fact]
@@ -37,12 +46,12 @@ public class InventoryControllerTests
         _repository.GetAllAsync().Returns(items);
 
         // Act
-        var result = await _controller.GetAll();
+        var result = await _controller.GetAll(_defaultPagination);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var returnedItems = Assert.IsAssignableFrom<IEnumerable<InventoryItem>>(okResult.Value);
-        Assert.Equal(2, returnedItems.Count());
+        var pagedResult = Assert.IsType<PagedResult<InventoryItem>>(okResult.Value);
+        Assert.Equal(2, pagedResult.Items.Count());
     }
 
     [Fact]
@@ -52,12 +61,12 @@ public class InventoryControllerTests
         _repository.GetAllAsync().Returns([]);
 
         // Act
-        var result = await _controller.GetAll();
+        var result = await _controller.GetAll(_defaultPagination);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var returnedItems = Assert.IsAssignableFrom<IEnumerable<InventoryItem>>(okResult.Value);
-        Assert.Empty(returnedItems);
+        var pagedResult = Assert.IsType<PagedResult<InventoryItem>>(okResult.Value);
+        Assert.Empty(pagedResult.Items);
     }
 
     [Fact]
@@ -71,10 +80,11 @@ public class InventoryControllerTests
         _repository.GetAllAsync().Returns(items);
 
         // Act
-        await _controller.GetAll();
+        await _controller.GetAll(_defaultPagination);
 
-        // Assert - Cache should contain the items
-        Assert.True(_cache.TryGetValue("inventory_all", out var cachedItems));
+        // Assert - Cache should contain the items with version key
+        var version = _cache.Get<int>("inventory_cache_version");
+        Assert.True(_cache.TryGetValue($"inventory_all_v{version}_page1_size20", out var cachedItems));
         Assert.NotNull(cachedItems);
     }
 
@@ -89,8 +99,8 @@ public class InventoryControllerTests
         _repository.GetAllAsync().Returns(items);
 
         // Act - Call twice
-        await _controller.GetAll();
-        await _controller.GetAll();
+        await _controller.GetAll(_defaultPagination);
+        await _controller.GetAll(_defaultPagination);
 
         // Assert - Repository should only be called once (second call uses cache)
         await _repository.Received(1).GetAllAsync();
@@ -160,15 +170,17 @@ public class InventoryControllerTests
         var createdItem = new InventoryItem { ItemId = 2, Name = "NewItem", Quantity = 5, Location = "C3" };
         _repository.CreateAsync(newItem).Returns(createdItem);
 
-        // Populate cache
-        await _controller.GetAll();
-        Assert.True(_cache.TryGetValue("inventory_all", out _));
+        // Populate cache - version starts at 0
+        await _controller.GetAll(_defaultPagination);
+        var initialVersion = _cache.Get<int>("inventory_cache_version");
+        Assert.True(_cache.TryGetValue($"inventory_all_v{initialVersion}_page1_size20", out _));
 
         // Act
         await _controller.Create(newItem);
 
-        // Assert - Cache should be invalidated
-        Assert.False(_cache.TryGetValue("inventory_all", out _));
+        // Assert - Cache version should be incremented
+        var newVersion = _cache.Get<int>("inventory_cache_version");
+        Assert.True(newVersion > initialVersion);
     }
 
     [Fact]
@@ -210,14 +222,16 @@ public class InventoryControllerTests
         _repository.DeleteAsync(1).Returns(true);
 
         // Populate cache
-        await _controller.GetAll();
-        Assert.True(_cache.TryGetValue("inventory_all", out _));
+        await _controller.GetAll(_defaultPagination);
+        var initialVersion = _cache.Get<int>("inventory_cache_version");
+        Assert.True(_cache.TryGetValue($"inventory_all_v{initialVersion}_page1_size20", out _));
 
         // Act
         await _controller.Delete(1);
 
-        // Assert - Cache should be invalidated
-        Assert.False(_cache.TryGetValue("inventory_all", out _));
+        // Assert - Cache version should be incremented
+        var newVersion = _cache.Get<int>("inventory_cache_version");
+        Assert.True(newVersion > initialVersion);
     }
 
     [Fact]
@@ -232,13 +246,15 @@ public class InventoryControllerTests
         _repository.DeleteAsync(999).Returns(false);
 
         // Populate cache
-        await _controller.GetAll();
-        Assert.True(_cache.TryGetValue("inventory_all", out _));
+        await _controller.GetAll(_defaultPagination);
+        var initialVersion = _cache.Get<int>("inventory_cache_version");
+        Assert.True(_cache.TryGetValue($"inventory_all_v{initialVersion}_page1_size20", out _));
 
         // Act
         await _controller.Delete(999);
 
-        // Assert - Cache should still exist (delete failed)
-        Assert.True(_cache.TryGetValue("inventory_all", out _));
+        // Assert - Cache version should remain the same (delete failed)
+        var newVersion = _cache.Get<int>("inventory_cache_version");
+        Assert.Equal(initialVersion, newVersion);
     }
 }

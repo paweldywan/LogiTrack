@@ -27,6 +27,24 @@ public class OrderRepository(LogiTrackContext context) : IOrderRepository
         return order;
     }
 
+    public async Task<Order?> UpdateAsync(Order order)
+    {
+        var existing = await context.Orders
+            .Include(o => o.Items)
+            .FirstOrDefaultAsync(o => o.OrderId == order.OrderId);
+
+        if (existing is null)
+            return null;
+
+        existing.CustomerName = order.CustomerName;
+        // DatePlaced is not updated - it's immutable
+        // Items collection would need separate handling for complex scenarios
+
+        await context.SaveChangesAsync();
+
+        return existing;
+    }
+
     public async Task<bool> DeleteAsync(int id)
     {
         var order = await context.Orders.FindAsync(id);

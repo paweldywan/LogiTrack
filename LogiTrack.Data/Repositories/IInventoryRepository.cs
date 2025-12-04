@@ -10,5 +10,7 @@ public interface IInventoryRepository
 
     Task<InventoryItem> CreateAsync(InventoryItem item);
 
+    Task<InventoryItem?> UpdateAsync(InventoryItem item);
+
     Task<bool> DeleteAsync(int id);
 }

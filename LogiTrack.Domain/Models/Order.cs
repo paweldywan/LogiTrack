@@ -1,6 +1,6 @@
 namespace LogiTrack.Domain.Models;
 
-public class Order
+public class Order : IAuditableEntity
 {
     private const int DefaultItemCapacity = 10;
 
@@ -11,6 +11,15 @@ public class Order
     public DateTime DatePlaced { get; set; }
 
     public HashSet<InventoryItem> Items { get; set; } = new(DefaultItemCapacity);
+
+    // Audit fields
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime? UpdatedAt { get; set; }
+
+    public bool IsDeleted { get; set; }
+
+    public DateTime? DeletedAt { get; set; }
 
     public void AddItem(InventoryItem item)
     {

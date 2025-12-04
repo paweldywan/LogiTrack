@@ -23,6 +23,23 @@ public class InventoryRepository(LogiTrackContext context) : IInventoryRepositor
         return item;
     }
 
+    public async Task<InventoryItem?> UpdateAsync(InventoryItem item)
+    {
+        var existing = await context.InventoryItems.FindAsync(item.ItemId);
+
+        if (existing is null)
+            return null;
+
+        existing.Name = item.Name;
+        existing.Quantity = item.Quantity;
+        existing.Location = item.Location;
+        existing.OrderId = item.OrderId;
+
+        await context.SaveChangesAsync();
+
+        return existing;
+    }
+
     public async Task<bool> DeleteAsync(int id)
     {
         var item = await context.InventoryItems.FindAsync(id);

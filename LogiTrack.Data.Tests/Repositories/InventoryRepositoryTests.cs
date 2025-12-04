@@ -132,7 +132,7 @@ public class InventoryRepositoryTests
     }
 
     [Fact]
-    public async Task DeleteAsync_ExistingItem_RemovesItemAndReturnsTrue()
+    public async Task DeleteAsync_ExistingItem_SoftDeletesItemAndReturnsTrue()
     {
         // Arrange
         using var context = CreateInMemoryContext();
@@ -151,9 +151,16 @@ public class InventoryRepositoryTests
         // Assert
         Assert.True(result);
 
+        // FindAsync bypasses query filters, so check IsDeleted flag
         var deletedItem = await context.InventoryItems.FindAsync(item.ItemId);
 
-        Assert.Null(deletedItem);
+        Assert.NotNull(deletedItem);
+        Assert.True(deletedItem.IsDeleted);
+        Assert.NotNull(deletedItem.DeletedAt);
+        
+        // Verify query filter excludes soft-deleted items
+        var allItems = await context.InventoryItems.ToListAsync();
+        Assert.DoesNotContain(allItems, i => i.ItemId == item.ItemId);
     }
 
     [Fact]

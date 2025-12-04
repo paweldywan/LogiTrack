@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace LogiTrack.Domain.Models;
 
-public class InventoryItem : IEquatable<InventoryItem>
+public class InventoryItem : IEquatable<InventoryItem>, IAuditableEntity
 {
     public int ItemId { get; set; }
 
@@ -16,6 +16,15 @@ public class InventoryItem : IEquatable<InventoryItem>
 
     [JsonIgnore]
     public Order? Order { get; set; }
+
+    // Audit fields
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime? UpdatedAt { get; set; }
+
+    public bool IsDeleted { get; set; }
+
+    public DateTime? DeletedAt { get; set; }
 
     public override string ToString() => $"Item: {Name} | Quantity: {Quantity} | Location: {Location}";
 

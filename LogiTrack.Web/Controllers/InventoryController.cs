@@ -1,7 +1,12 @@
 using System.Diagnostics;
 
+using Asp.Versioning;
+
+using FluentValidation;
+
 using LogiTrack.Data.Repositories;
 using LogiTrack.Domain.Models;
+using LogiTrack.Web.Models;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,27 +15,49 @@ using Microsoft.Extensions.Caching.Memory;
 namespace LogiTrack.Web.Controllers;
 
 [ApiController]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Route("api/[controller]")]
 [Authorize(Policy = "ApiAccess")]
 public class InventoryController(
     IInventoryRepository inventoryRepository,
     IMemoryCache cache,
-    ILogger<InventoryController> logger) : ControllerBase
+    ILogger<InventoryController> logger,
+    IValidator<InventoryItem> validator) : ControllerBase
 {
     private const string InventoryCacheKey = "inventory_all";
     private const string InventoryItemCacheKeyPrefix = "inventory_item_";
+    private const string CacheVersionKey = "inventory_cache_version";
+    private static readonly TimeSpan CollectionCacheExpiration = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan ItemCacheExpiration = TimeSpan.FromMinutes(10);
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<InventoryItem>>> GetAll()
+    public async Task<ActionResult<PagedResult<InventoryItem>>> GetAll([FromQuery] PaginationQuery pagination)
     {
         var stopwatch = Stopwatch.StartNew();
-        var cacheHit = cache.TryGetValue(InventoryCacheKey, out _);
+        var cacheVersion = cache.GetOrCreate(CacheVersionKey, _ => 0);
+        var cacheKey = $"{InventoryCacheKey}_v{cacheVersion}_page{pagination.Page}_size{pagination.PageSize}";
+        var cacheHit = cache.TryGetValue(cacheKey, out _);
 
-        var items = await cache.GetOrCreateAsync(InventoryCacheKey, entry =>
+        var result = await cache.GetOrCreateAsync(cacheKey, async entry =>
         {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30);
+            entry.SetAbsoluteExpiration(CollectionCacheExpiration);
+            entry.SetSlidingExpiration(TimeSpan.FromMinutes(2));
 
-            return inventoryRepository.GetAllAsync();
+            var allItems = await inventoryRepository.GetAllAsync();
+            var totalItems = allItems.Count;
+            var pagedItems = allItems
+                .Skip((pagination.Page - 1) * pagination.PageSize)
+                .Take(pagination.PageSize)
+                .ToList();
+
+            return new PagedResult<InventoryItem>
+            {
+                Items = pagedItems,
+                Page = pagination.Page,
+                PageSize = pagination.PageSize,
+                TotalItems = totalItems
+            };
         });
 
         stopwatch.Stop();
@@ -40,7 +67,7 @@ public class InventoryController(
             stopwatch.ElapsedMilliseconds,
             cacheHit ? "HIT" : "MISS");
 
-        return Ok(items);
+        return Ok(result);
     }
 
     [HttpGet("{id}")]
@@ -50,8 +77,8 @@ public class InventoryController(
 
         var item = await cache.GetOrCreateAsync(cacheKey, entry =>
         {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(60);
-
+            entry.SetAbsoluteExpiration(ItemCacheExpiration);
+            entry.SetSlidingExpiration(TimeSpan.FromMinutes(3));
             return inventoryRepository.GetByIdAsync(id);
         });
 
@@ -72,13 +99,67 @@ public class InventoryController(
     [Authorize(Roles = "Manager")]
     public async Task<ActionResult<InventoryItem>> Create(InventoryItem item)
     {
+        var validationResult = await validator.ValidateAsync(item);
+
+        if (!validationResult.IsValid)
+        {
+            return ValidationProblem(new ValidationProblemDetails(
+                validationResult.Errors
+                    .GroupBy(e => e.PropertyName)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Select(e => e.ErrorMessage).ToArray())));
+        }
+
         var created = await inventoryRepository.CreateAsync(item);
 
-        cache.Remove(InventoryCacheKey);
+        InvalidateCollectionCache();
 
         logger.LogInformation("Cache invalidated after creating item {ItemId}", created.ItemId);
 
         return CreatedAtAction(nameof(GetById), new { id = created.ItemId }, created);
+    }
+
+    [HttpPut("{id}")]
+    [Authorize(Roles = "Manager")]
+    public async Task<ActionResult<InventoryItem>> Update(int id, InventoryItem item)
+    {
+        if (id != item.ItemId)
+        {
+            return Problem(
+                title: "ID mismatch",
+                detail: "The ID in the URL does not match the ID in the request body.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var validationResult = await validator.ValidateAsync(item);
+
+        if (!validationResult.IsValid)
+        {
+            return ValidationProblem(new ValidationProblemDetails(
+                validationResult.Errors
+                    .GroupBy(e => e.PropertyName)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Select(e => e.ErrorMessage).ToArray())));
+        }
+
+        var updated = await inventoryRepository.UpdateAsync(item);
+
+        if (updated is null)
+        {
+            return Problem(
+                title: "Inventory item not found",
+                detail: $"Cannot update item. No inventory item exists with ID {id}.",
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        InvalidateCollectionCache();
+        cache.Remove($"{InventoryItemCacheKeyPrefix}{id}");
+
+        logger.LogInformation("Cache invalidated after updating item {ItemId}", id);
+
+        return Ok(updated);
     }
 
     [HttpDelete("{id}")]
@@ -93,11 +174,18 @@ public class InventoryController(
                 detail: $"Cannot delete item. No inventory item exists with ID {id}.",
                 statusCode: StatusCodes.Status404NotFound);
 
-        cache.Remove(InventoryCacheKey);
+        InvalidateCollectionCache();
         cache.Remove($"{InventoryItemCacheKeyPrefix}{id}");
 
         logger.LogInformation("Cache invalidated after deleting item {ItemId}", id);
 
         return NoContent();
+    }
+
+    private void InvalidateCollectionCache()
+    {
+        // Increment cache version to invalidate all paginated cache entries
+        var currentVersion = cache.GetOrCreate(CacheVersionKey, _ => 0);
+        cache.Set(CacheVersionKey, currentVersion + 1);
     }
 }

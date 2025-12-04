@@ -492,6 +492,5 @@ public class AuthenticationTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    private record LoginResponse(string TokenType, string AccessToken, int ExpiresIn, string RefreshToken);
     private record UserInfoResponse(string Email, bool IsEmailConfirmed);
 }

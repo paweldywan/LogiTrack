@@ -1,6 +1,10 @@
+using FluentValidation;
+using FluentValidation.Results;
+
 using LogiTrack.Data.Repositories;
 using LogiTrack.Domain.Models;
 using LogiTrack.Web.Controllers;
+using LogiTrack.Web.Models;
 
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
@@ -15,14 +19,19 @@ public class OrderControllerTests
     private readonly IOrderRepository _repository;
     private readonly IMemoryCache _cache;
     private readonly ILogger<OrderController> _logger;
+    private readonly IValidator<Order> _validator;
     private readonly OrderController _controller;
+    private readonly PaginationQuery _defaultPagination = new();
 
     public OrderControllerTests()
     {
         _repository = Substitute.For<IOrderRepository>();
         _cache = new MemoryCache(new MemoryCacheOptions());
         _logger = Substitute.For<ILogger<OrderController>>();
-        _controller = new OrderController(_repository, _cache, _logger);
+        _validator = Substitute.For<IValidator<Order>>();
+        _validator.ValidateAsync(Arg.Any<Order>(), Arg.Any<CancellationToken>())
+            .Returns(new ValidationResult());
+        _controller = new OrderController(_repository, _cache, _logger, _validator);
     }
 
     [Fact]
@@ -37,12 +46,12 @@ public class OrderControllerTests
         _repository.GetAllAsync().Returns(orders);
 
         // Act
-        var result = await _controller.GetAll();
+        var result = await _controller.GetAll(_defaultPagination);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var returnedOrders = Assert.IsAssignableFrom<IEnumerable<Order>>(okResult.Value);
-        Assert.Equal(2, returnedOrders.Count());
+        var pagedResult = Assert.IsType<PagedResult<Order>>(okResult.Value);
+        Assert.Equal(2, pagedResult.Items.Count());
     }
 
     [Fact]
@@ -52,12 +61,12 @@ public class OrderControllerTests
         _repository.GetAllAsync().Returns([]);
 
         // Act
-        var result = await _controller.GetAll();
+        var result = await _controller.GetAll(_defaultPagination);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var returnedOrders = Assert.IsAssignableFrom<IEnumerable<Order>>(okResult.Value);
-        Assert.Empty(returnedOrders);
+        var pagedResult = Assert.IsType<PagedResult<Order>>(okResult.Value);
+        Assert.Empty(pagedResult.Items);
     }
 
     [Fact]

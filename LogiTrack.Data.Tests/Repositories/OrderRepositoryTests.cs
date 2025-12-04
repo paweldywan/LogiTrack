@@ -208,7 +208,7 @@ public class OrderRepositoryTests
     }
 
     [Fact]
-    public async Task DeleteAsync_ExistingOrder_RemovesOrderAndReturnsTrue()
+    public async Task DeleteAsync_ExistingOrder_SoftDeletesOrderAndReturnsTrue()
     {
         // Arrange
         using var context = CreateInMemoryContext();
@@ -227,9 +227,16 @@ public class OrderRepositoryTests
         // Assert
         Assert.True(result);
 
+        // FindAsync bypasses query filters, so check IsDeleted flag
         var deletedOrder = await context.Orders.FindAsync(order.OrderId);
 
-        Assert.Null(deletedOrder);
+        Assert.NotNull(deletedOrder);
+        Assert.True(deletedOrder.IsDeleted);
+        Assert.NotNull(deletedOrder.DeletedAt);
+        
+        // Verify query filter excludes soft-deleted orders
+        var allOrders = await context.Orders.ToListAsync();
+        Assert.DoesNotContain(allOrders, o => o.OrderId == order.OrderId);
     }
 
     [Fact]
