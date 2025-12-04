@@ -26,6 +26,13 @@ services.AddIdentityApiEndpoints<ApplicationUser>()
 services.AddAuthorizationBuilder()
     .AddPolicy("ApiAccess", policy => policy.RequireAuthenticatedUser());
 
+services.AddMemoryCache();
+
+services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+});
+
 services.AddScoped<DbSeeder>();
 
 services.AddScoped<IInventoryRepository, InventoryRepository>();
@@ -43,6 +50,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseResponseCompression();
 
 app.UseAuthentication();
 

@@ -6,9 +6,13 @@ namespace LogiTrack.Data.Repositories;
 
 public class InventoryRepository(LogiTrackContext context) : IInventoryRepository
 {
-    public Task<List<InventoryItem>> GetAllAsync() => context.InventoryItems.ToListAsync();
+    public Task<List<InventoryItem>> GetAllAsync() => context.InventoryItems
+        .AsNoTracking()
+        .ToListAsync();
 
-    public ValueTask<InventoryItem?> GetByIdAsync(int id) => context.InventoryItems.FindAsync(id);
+    public Task<InventoryItem?> GetByIdAsync(int id) => context.InventoryItems
+        .AsNoTracking()
+        .FirstOrDefaultAsync(i => i.ItemId == id);
 
     public async Task<InventoryItem> CreateAsync(InventoryItem item)
     {

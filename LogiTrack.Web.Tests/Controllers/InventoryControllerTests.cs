@@ -3,6 +3,8 @@ using LogiTrack.Domain.Models;
 using LogiTrack.Web.Controllers;
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 
 using NSubstitute;
 
@@ -11,12 +13,16 @@ namespace LogiTrack.Web.Tests.Controllers;
 public class InventoryControllerTests
 {
     private readonly IInventoryRepository _repository;
+    private readonly IMemoryCache _cache;
+    private readonly ILogger<InventoryController> _logger;
     private readonly InventoryController _controller;
 
     public InventoryControllerTests()
     {
         _repository = Substitute.For<IInventoryRepository>();
-        _controller = new InventoryController(_repository);
+        _cache = new MemoryCache(new MemoryCacheOptions());
+        _logger = Substitute.For<ILogger<InventoryController>>();
+        _controller = new InventoryController(_repository, _cache, _logger);
     }
 
     [Fact]
@@ -43,7 +49,7 @@ public class InventoryControllerTests
     public async Task GetAll_ReturnsEmptyList_WhenNoItems()
     {
         // Arrange
-        _repository.GetAllAsync().Returns(new List<InventoryItem>());
+        _repository.GetAllAsync().Returns([]);
 
         // Act
         var result = await _controller.GetAll();
@@ -52,6 +58,42 @@ public class InventoryControllerTests
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var returnedItems = Assert.IsAssignableFrom<IEnumerable<InventoryItem>>(okResult.Value);
         Assert.Empty(returnedItems);
+    }
+
+    [Fact]
+    public async Task GetAll_CachesResult_OnFirstCall()
+    {
+        // Arrange
+        var items = new List<InventoryItem>
+        {
+            new() { ItemId = 1, Name = "Item1", Quantity = 10, Location = "A1" }
+        };
+        _repository.GetAllAsync().Returns(items);
+
+        // Act
+        await _controller.GetAll();
+
+        // Assert - Cache should contain the items
+        Assert.True(_cache.TryGetValue("inventory_all", out var cachedItems));
+        Assert.NotNull(cachedItems);
+    }
+
+    [Fact]
+    public async Task GetAll_ReturnsCachedResult_OnSubsequentCalls()
+    {
+        // Arrange
+        var items = new List<InventoryItem>
+        {
+            new() { ItemId = 1, Name = "Item1", Quantity = 10, Location = "A1" }
+        };
+        _repository.GetAllAsync().Returns(items);
+
+        // Act - Call twice
+        await _controller.GetAll();
+        await _controller.GetAll();
+
+        // Assert - Repository should only be called once (second call uses cache)
+        await _repository.Received(1).GetAllAsync();
     }
 
     [Fact]
@@ -105,6 +147,31 @@ public class InventoryControllerTests
     }
 
     [Fact]
+    public async Task Create_InvalidatesCache()
+    {
+        // Arrange
+        var items = new List<InventoryItem>
+        {
+            new() { ItemId = 1, Name = "Item1", Quantity = 10, Location = "A1" }
+        };
+        _repository.GetAllAsync().Returns(items);
+
+        var newItem = new InventoryItem { Name = "NewItem", Quantity = 5, Location = "C3" };
+        var createdItem = new InventoryItem { ItemId = 2, Name = "NewItem", Quantity = 5, Location = "C3" };
+        _repository.CreateAsync(newItem).Returns(createdItem);
+
+        // Populate cache
+        await _controller.GetAll();
+        Assert.True(_cache.TryGetValue("inventory_all", out _));
+
+        // Act
+        await _controller.Create(newItem);
+
+        // Assert - Cache should be invalidated
+        Assert.False(_cache.TryGetValue("inventory_all", out _));
+    }
+
+    [Fact]
     public async Task Delete_ReturnsNoContent_WhenItemDeleted()
     {
         // Arrange
@@ -129,5 +196,49 @@ public class InventoryControllerTests
         // Assert
         var objectResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(404, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_InvalidatesCache_WhenItemDeleted()
+    {
+        // Arrange
+        var items = new List<InventoryItem>
+        {
+            new() { ItemId = 1, Name = "Item1", Quantity = 10, Location = "A1" }
+        };
+        _repository.GetAllAsync().Returns(items);
+        _repository.DeleteAsync(1).Returns(true);
+
+        // Populate cache
+        await _controller.GetAll();
+        Assert.True(_cache.TryGetValue("inventory_all", out _));
+
+        // Act
+        await _controller.Delete(1);
+
+        // Assert - Cache should be invalidated
+        Assert.False(_cache.TryGetValue("inventory_all", out _));
+    }
+
+    [Fact]
+    public async Task Delete_DoesNotInvalidateCache_WhenItemNotFound()
+    {
+        // Arrange
+        var items = new List<InventoryItem>
+        {
+            new() { ItemId = 1, Name = "Item1", Quantity = 10, Location = "A1" }
+        };
+        _repository.GetAllAsync().Returns(items);
+        _repository.DeleteAsync(999).Returns(false);
+
+        // Populate cache
+        await _controller.GetAll();
+        Assert.True(_cache.TryGetValue("inventory_all", out _));
+
+        // Act
+        await _controller.Delete(999);
+
+        // Assert - Cache should still exist (delete failed)
+        Assert.True(_cache.TryGetValue("inventory_all", out _));
     }
 }

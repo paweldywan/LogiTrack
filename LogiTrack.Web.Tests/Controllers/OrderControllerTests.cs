@@ -3,6 +3,8 @@ using LogiTrack.Domain.Models;
 using LogiTrack.Web.Controllers;
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 
 using NSubstitute;
 
@@ -11,12 +13,16 @@ namespace LogiTrack.Web.Tests.Controllers;
 public class OrderControllerTests
 {
     private readonly IOrderRepository _repository;
+    private readonly IMemoryCache _cache;
+    private readonly ILogger<OrderController> _logger;
     private readonly OrderController _controller;
 
     public OrderControllerTests()
     {
         _repository = Substitute.For<IOrderRepository>();
-        _controller = new OrderController(_repository);
+        _cache = new MemoryCache(new MemoryCacheOptions());
+        _logger = Substitute.For<ILogger<OrderController>>();
+        _controller = new OrderController(_repository, _cache, _logger);
     }
 
     [Fact]
@@ -43,7 +49,7 @@ public class OrderControllerTests
     public async Task GetAll_ReturnsEmptyList_WhenNoOrders()
     {
         // Arrange
-        _repository.GetAllAsync().Returns(new List<Order>());
+        _repository.GetAllAsync().Returns([]);
 
         // Act
         var result = await _controller.GetAll();

@@ -6,7 +6,7 @@ public interface IInventoryRepository
 {
     Task<List<InventoryItem>> GetAllAsync();
 
-    ValueTask<InventoryItem?> GetByIdAsync(int id);
+    Task<InventoryItem?> GetByIdAsync(int id);
 
     Task<InventoryItem> CreateAsync(InventoryItem item);
 
