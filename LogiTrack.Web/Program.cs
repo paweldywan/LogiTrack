@@ -1,5 +1,6 @@
 using LogiTrack.Data;
 using LogiTrack.Data.Repositories;
+using Microsoft.AspNetCore.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +19,13 @@ var connectionString = configuration.GetConnectionString("LogiTrack");
 
 services.AddSqlite<LogiTrackContext>(connectionString);
 
+services.AddIdentityApiEndpoints<ApplicationUser>()
+    .AddRoles<IdentityRole>()
+    .AddEntityFrameworkStores<LogiTrackContext>();
+
+services.AddAuthorizationBuilder()
+    .AddPolicy("ApiAccess", policy => policy.RequireAuthenticatedUser());
+
 services.AddScoped<DbSeeder>();
 
 services.AddScoped<IInventoryRepository, InventoryRepository>();
@@ -30,12 +38,19 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
+
     app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
+
+app.UseAuthorization();
+
 app.MapControllers();
+
+app.MapIdentityApi<ApplicationUser>();
 
 using var scope = app.Services.CreateScope();
 
@@ -44,3 +59,6 @@ var seeder = scope.ServiceProvider.GetRequiredService<DbSeeder>();
 await seeder.SeedAsync();
 
 await app.RunAsync();
+
+// Make Program accessible for integration tests
+public partial class Program { }

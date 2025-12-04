@@ -1,12 +1,14 @@
 using LogiTrack.Data.Repositories;
 using LogiTrack.Domain.Models;
 
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LogiTrack.Web.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Policy = "ApiAccess")]
 public class InventoryController(IInventoryRepository inventoryRepository) : ControllerBase
 {
     [HttpGet]
@@ -32,6 +34,7 @@ public class InventoryController(IInventoryRepository inventoryRepository) : Con
     }
 
     [HttpPost]
+    [Authorize(Roles = "Manager")]
     public async Task<ActionResult<InventoryItem>> Create(InventoryItem item)
     {
         var created = await inventoryRepository.CreateAsync(item);
@@ -40,6 +43,7 @@ public class InventoryController(IInventoryRepository inventoryRepository) : Con
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Manager")]
     public async Task<IActionResult> Delete(int id)
     {
         var deleted = await inventoryRepository.DeleteAsync(id);
