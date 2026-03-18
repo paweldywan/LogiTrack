@@ -28,7 +28,7 @@ A production-ready logistics and inventory management API built with ASP.NET Cor
 
 ```bash
 # Clone the repository
-git clone https://github.com/paweldywan/LogiTrack.git
+git clone https://github.com/paweldywandev/LogiTrack.git
 cd LogiTrack
 
 # Apply database migrations
@@ -248,3 +248,4 @@ Request → Rate Limiter → Correlation ID Middleware → Authentication
 ## License
 
 This project is licensed under the MIT License.
+
